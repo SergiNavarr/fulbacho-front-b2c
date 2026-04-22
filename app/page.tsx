@@ -1,25 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Search,
-  Calendar,
-  Shield,
-  User,
-  Check,
-  Inbox,
-  Send,
-  X,
-} from "lucide-react";
+import { Search, Calendar, Shield, User, Check, Inbox, Send, X } from "lucide-react";
+import MyTeamManager from "@/components/views/MyTeamManager"; // Importamos tu nuevo componente
 
 type Tab = "team" | "search" | "challenges";
 type ChallengeSubTab = "received" | "sent";
-
-interface TeamData {
-  name: string;
-  shieldUrl: string;
-  level: string;
-}
 
 interface Toast {
   message: string;
@@ -27,15 +13,9 @@ interface Toast {
 }
 
 export default function FulbachoApp() {
+  // Estados de navegación general
   const [activeTab, setActiveTab] = useState<Tab>("team");
-  const [challengeSubTab, setChallengeSubTab] =
-    useState<ChallengeSubTab>("received");
-  const [teamData, setTeamData] = useState<TeamData>({
-    name: "",
-    shieldUrl: "",
-    level: "amateur",
-  });
-  const [isSaving, setIsSaving] = useState(false);
+  const [challengeSubTab, setChallengeSubTab] = useState<ChallengeSubTab>("received");
   const [toast, setToast] = useState<Toast>({ message: "", visible: false });
 
   // Search filters state
@@ -45,19 +25,12 @@ export default function FulbachoApp() {
     endTime: "22:00",
   });
 
+  // Función global para mostrar notificaciones (se la pasamos a los sub-componentes)
   const showToast = (message: string) => {
     setToast({ message, visible: true });
     setTimeout(() => {
       setToast({ message: "", visible: false });
     }, 3000);
-  };
-
-  const handleSaveTeam = async () => {
-    setIsSaving(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setIsSaving(false);
-    showToast("¡Equipo guardado exitosamente!");
   };
 
   const mockRivals = [
@@ -85,6 +58,7 @@ export default function FulbachoApp() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       {/* Mobile Container */}
       <div className="w-full max-w-md h-[calc(100vh-2rem)] max-h-[850px] bg-card shadow-2xl rounded-3xl relative overflow-hidden flex flex-col border border-border">
+        
         {/* Header */}
         <header className="flex-shrink-0 flex items-center justify-between px-5 py-4 bg-primary text-primary-foreground">
           <h1 className="text-xl font-bold tracking-tight">⚽ Fulbacho</h1>
@@ -93,16 +67,12 @@ export default function FulbachoApp() {
           </div>
         </header>
 
-        {/* Content Area */}
+        {/* Content Area - Ahora usando el Enrutador/Gestor condicional */}
         <main className="flex-1 overflow-y-auto">
           {activeTab === "team" && (
-            <MyTeamView
-              teamData={teamData}
-              setTeamData={setTeamData}
-              onSave={handleSaveTeam}
-              isSaving={isSaving}
-            />
+            <MyTeamManager showToast={showToast} /> 
           )}
+          
           {activeTab === "search" && (
             <SearchRivalView
               filters={searchFilters}
@@ -110,6 +80,7 @@ export default function FulbachoApp() {
               rivals={mockRivals}
             />
           )}
+          
           {activeTab === "challenges" && (
             <MyChallengesView
               subTab={challengeSubTab}
@@ -135,7 +106,7 @@ export default function FulbachoApp() {
             />
             <TabButton
               icon={<Shield className="w-5 h-5" />}
-              label="Mi Equipo"
+              label="Mis Equipos"
               isActive={activeTab === "team"}
               onClick={() => setActiveTab("team")}
             />
@@ -162,6 +133,10 @@ export default function FulbachoApp() {
   );
 }
 
+// ==========================================
+// COMPONENTES RESTANTES 
+// ==========================================
+
 // Tab Button Component
 function TabButton({
   icon,
@@ -186,132 +161,6 @@ function TabButton({
       {icon}
       <span className="text-xs font-medium">{label}</span>
     </button>
-  );
-}
-
-// VIEW 1: My Team
-function MyTeamView({
-  teamData,
-  setTeamData,
-  onSave,
-  isSaving,
-}: {
-  teamData: TeamData;
-  setTeamData: React.Dispatch<React.SetStateAction<TeamData>>;
-  onSave: () => void;
-  isSaving: boolean;
-}) {
-  return (
-    <div className="p-5 space-y-6">
-      <div className="space-y-1">
-        <h2 className="text-lg font-bold text-foreground">Mi Equipo</h2>
-        <p className="text-sm text-muted-foreground">
-          Configurá los datos de tu equipo para encontrar rivales
-        </p>
-      </div>
-
-      {/* Team Preview */}
-      <div className="flex items-center gap-4 p-4 bg-secondary/50 rounded-2xl">
-        <div className="w-16 h-16 rounded-2xl bg-primary/10 border-2 border-dashed border-primary/30 flex items-center justify-center overflow-hidden">
-          {teamData.shieldUrl ? (
-            <img
-              src={teamData.shieldUrl}
-              alt="Escudo del equipo"
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
-            />
-          ) : (
-            <Shield className="w-8 h-8 text-primary/40" />
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-foreground truncate">
-            {teamData.name || "Nombre del equipo"}
-          </p>
-          <p className="text-sm text-muted-foreground capitalize">
-            {teamData.level === "amateur"
-              ? "Amateur"
-              : teamData.level === "intermedio"
-                ? "Intermedio"
-                : "Competitivo"}
-          </p>
-        </div>
-      </div>
-
-      {/* Form Fields */}
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground">
-            Nombre del Equipo
-          </label>
-          <input
-            type="text"
-            value={teamData.name}
-            onChange={(e) =>
-              setTeamData((prev) => ({ ...prev, name: e.target.value }))
-            }
-            placeholder="Ej: Los Cracks FC"
-            className="w-full h-12 px-4 rounded-xl bg-input border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground">
-            URL del Escudo
-          </label>
-          <input
-            type="url"
-            value={teamData.shieldUrl}
-            onChange={(e) =>
-              setTeamData((prev) => ({ ...prev, shieldUrl: e.target.value }))
-            }
-            placeholder="https://ejemplo.com/escudo.png"
-            className="w-full h-12 px-4 rounded-xl bg-input border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
-          />
-          <p className="text-xs text-muted-foreground">
-            Ingresá un link a la imagen de tu escudo
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground">
-            Nivel Competitivo
-          </label>
-          <select
-            value={teamData.level}
-            onChange={(e) =>
-              setTeamData((prev) => ({ ...prev, level: e.target.value }))
-            }
-            className="w-full h-12 px-4 rounded-xl bg-input border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none cursor-pointer"
-          >
-            <option value="amateur">Amateur</option>
-            <option value="intermedio">Intermedio</option>
-            <option value="competitivo">Competitivo</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Save Button */}
-      <button
-        onClick={onSave}
-        disabled={isSaving}
-        className="w-full h-14 rounded-xl bg-primary text-primary-foreground font-semibold text-base transition-all hover:bg-primary/90 active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-      >
-        {isSaving ? (
-          <>
-            <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-            <span>Guardando...</span>
-          </>
-        ) : (
-          <>
-            <Check className="w-5 h-5" />
-            <span>Guardar Equipo</span>
-          </>
-        )}
-      </button>
-    </div>
   );
 }
 

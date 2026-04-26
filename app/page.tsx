@@ -55,87 +55,81 @@ export default function FulbachoApp() {
   ];
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      {/* Mobile Container */}
-      <div className="w-full max-w-md h-[calc(100vh-2rem)] max-h-[850px] bg-card shadow-2xl rounded-3xl relative overflow-hidden flex flex-col border border-border">
-        
-        {/* Header */}
-        <header className="flex-shrink-0 flex items-center justify-between px-5 py-4 bg-primary text-primary-foreground">
-          <h1 className="text-xl font-bold tracking-tight">⚽ Fulbacho</h1>
-          <div className="w-10 h-10 rounded-full bg-primary-foreground/20 flex items-center justify-center">
-            <User className="w-5 h-5" />
-          </div>
-        </header>
+    <div className="min-h-[100dvh] flex flex-col w-full max-w-md mx-auto bg-card sm:border-x sm:border-border sm:shadow-sm relative">
+      
+      {/* Header - Ahora es Sticky para que se quede arriba al hacer scroll */}
+      <header className="sticky top-0 z-50 flex-shrink-0 flex items-center justify-between px-5 py-4 bg-primary text-primary-foreground shadow-sm">
+        <h1 className="text-xl font-bold tracking-tight">⚽ Fulbacho</h1>
+        <div className="w-10 h-10 rounded-full bg-primary-foreground/20 flex items-center justify-center">
+          <User className="w-5 h-5" />
+        </div>
+      </header>
 
-        {/* Content Area - Ahora usando el Enrutador/Gestor condicional */}
-        <main className="flex-1 overflow-y-auto">
-          {activeTab === "team" && (
-            <MyTeamManager showToast={showToast} /> 
-          )}
-          
-          {activeTab === "search" && (
-            <SearchRivalView
-              filters={searchFilters}
-              setFilters={setSearchFilters}
-              rivals={mockRivals}
-            />
-          )}
-          
-          {activeTab === "challenges" && (
-            <MyChallengesView
-              subTab={challengeSubTab}
-              setSubTab={setChallengeSubTab}
-            />
-          )}
-        </main>
-
-        {/* Bottom Tab Navigation */}
-        <nav className="flex-shrink-0 border-t border-border bg-card">
-          <div className="flex items-center justify-around py-2">
-            <TabButton
-              icon={<Search className="w-5 h-5" />}
-              label="Buscar Rival"
-              isActive={activeTab === "search"}
-              onClick={() => setActiveTab("search")}
-            />
-            <TabButton
-              icon={<Calendar className="w-5 h-5" />}
-              label="Mis Desafíos"
-              isActive={activeTab === "challenges"}
-              onClick={() => setActiveTab("challenges")}
-            />
-            <TabButton
-              icon={<Shield className="w-5 h-5" />}
-              label="Mis Equipos"
-              isActive={activeTab === "team"}
-              onClick={() => setActiveTab("team")}
-            />
-          </div>
-        </nav>
-
-        {/* Toast Notification */}
-        {toast.visible && (
-          <div className="absolute bottom-20 left-4 right-4 bg-primary text-primary-foreground px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 animate-in slide-in-from-bottom-4 duration-300">
-            <div className="w-6 h-6 rounded-full bg-primary-foreground/20 flex items-center justify-center flex-shrink-0">
-              <Check className="w-4 h-4" />
-            </div>
-            <span className="text-sm font-medium">{toast.message}</span>
-            <button
-              onClick={() => setToast({ message: "", visible: false })}
-              className="ml-auto"
-            >
-              <X className="w-4 h-4 opacity-70" />
-            </button>
-          </div>
+      <main className="flex-1 flex flex-col bg-background">
+        {activeTab === "team" && (
+          <MyTeamManager showToast={showToast} /> 
         )}
-      </div>
+        
+        {activeTab === "search" && (
+          <SearchRivalView
+            filters={searchFilters}
+            setFilters={setSearchFilters}
+            rivals={mockRivals}
+          />
+        )}
+        
+        {activeTab === "challenges" && (
+          <MyChallengesView
+            subTab={challengeSubTab}
+            setSubTab={setChallengeSubTab}
+          />
+        )}
+      </main>
+
+      {/* Bottom Tab Navigation - Sticky al fondo de la pantalla */}
+      <nav className="sticky bottom-0 z-50 flex-shrink-0 border-t border-border bg-card">
+        <div className="flex items-center justify-around py-2">
+          <TabButton
+            icon={<Search className="w-5 h-5" />}
+            label="Buscar Rival"
+            isActive={activeTab === "search"}
+            onClick={() => setActiveTab("search")}
+          />
+          <TabButton
+            icon={<Calendar className="w-5 h-5" />}
+            label="Mis Desafíos"
+            isActive={activeTab === "challenges"}
+            onClick={() => setActiveTab("challenges")}
+          />
+          <TabButton
+            icon={<Shield className="w-5 h-5" />}
+            label="Mis Equipos"
+            isActive={activeTab === "team"}
+            onClick={() => setActiveTab("team")}
+          />
+        </div>
+      </nav>
+
+      {/* Toast Notification - Ajustado para que flote sobre la navegación */}
+      {toast.visible && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-[calc(28rem-2rem)] bg-foreground text-background px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-300 z-[100]">
+          <div className="w-6 h-6 rounded-full bg-background/20 flex items-center justify-center flex-shrink-0">
+            <Check className="w-4 h-4 text-background" />
+          </div>
+          <span className="text-sm font-medium">{toast.message}</span>
+          <button
+            onClick={() => setToast({ message: "", visible: false })}
+            className="ml-auto"
+          >
+            <X className="w-4 h-4 opacity-70" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
-// ==========================================
 // COMPONENTES RESTANTES 
-// ==========================================
 
 // Tab Button Component
 function TabButton({

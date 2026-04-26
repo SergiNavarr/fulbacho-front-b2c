@@ -165,7 +165,43 @@ function FormularioCrearEquipo({ equipoInicial, onBack, showToast, onEquipoGuard
     level: equipoInicial?.nivel.toLowerCase() || "amateur" 
   });
 
+  // Estado para manejar los mensajes de error visuales
+  const [errores, setErrores] = useState({
+    name: "",
+    shieldUrl: ""
+  });
+
+  // Función de validación local (Frontend)
+  const validarFormulario = () => {
+    let nuevosErrores = { name: "", shieldUrl: "" };
+    let isValid = true;
+
+    // Validación del nombre
+    if (!teamData.name.trim()) {
+      nuevosErrores.name = "El nombre del equipo es obligatorio.";
+      isValid = false;
+    } else if (teamData.name.length > 100) {
+      nuevosErrores.name = "El nombre no puede superar los 100 caracteres.";
+      isValid = false;
+    }
+
+    // Validación del escudo
+    if (!teamData.shieldUrl) {
+      nuevosErrores.shieldUrl = "Debes seleccionar un escudo para tu equipo.";
+      isValid = false;
+    }
+
+    setErrores(nuevosErrores);
+    return isValid;
+  };
+
   const handleSave = async () => {
+    // Cortamos la ejecución inmediatamente si la validación falla
+    if (!validarFormulario()) {
+      showToast("Por favor, corrige los errores del formulario.");
+      return; 
+    }
+
     setIsSaving(true);
     try {
       let idNivelBackend = 1;
@@ -173,7 +209,7 @@ function FormularioCrearEquipo({ equipoInicial, onBack, showToast, onEquipoGuard
       if (teamData.level === "competitivo") idNivelBackend = 3;
 
       const payload = {
-        nombre: teamData.name,
+        nombre: teamData.name.trim(), // Limpiamos espacios extra
         escudoUrl: teamData.shieldUrl,
         idNivel: idNivelBackend,
       };
@@ -184,26 +220,25 @@ function FormularioCrearEquipo({ equipoInicial, onBack, showToast, onEquipoGuard
         
         onEquipoGuardado({
           id: equipoInicial.id,
-          nombre: teamData.name,
+          nombre: payload.nombre,
           nivel: teamData.level.charAt(0).toUpperCase() + teamData.level.slice(1),
-          escudoUrl: teamData.shieldUrl
+          escudoUrl: payload.escudoUrl
         }, true);
 
       } else {
-        // Llamada POST al backend
         await equipoService.crear(payload);
         showToast("¡Equipo creado con éxito!");
 
         onEquipoGuardado({
           id: Math.floor(Math.random() * 1000), // ID temporal
-          nombre: teamData.name,
+          nombre: payload.nombre,
           nivel: teamData.level.charAt(0).toUpperCase() + teamData.level.slice(1),
-          escudoUrl: teamData.shieldUrl
+          escudoUrl: payload.escudoUrl
         }, false);
       }
       
     } catch (error) {
-      showToast("No se pudo conectar con el servidor.");
+      showToast("No se pudo conectar con el servidor o el nombre ya está en uso.");
     } finally {
       setIsSaving(false);
     }
@@ -252,18 +287,29 @@ function FormularioCrearEquipo({ equipoInicial, onBack, showToast, onEquipoGuard
 
       {/* Campos del Formulario */}
       <div className="space-y-4">
+        
+        {/* Campo: Nombre del Equipo */}
         <div className="space-y-2">
           <label className="text-sm font-medium text-foreground">Nombre del Equipo</label>
           <input
             type="text"
             value={teamData.name}
-            onChange={(e) => setTeamData((prev) => ({ ...prev, name: e.target.value }))}
+            onChange={(e) => {
+              setTeamData((prev) => ({ ...prev, name: e.target.value }));
+              // Limpia el error visual apenas el usuario empieza a escribir
+              if (errores.name) setErrores((prev) => ({ ...prev, name: "" }));
+            }}
             placeholder="Ej: Los Cracks FC"
-            className="w-full h-12 px-4 rounded-xl bg-input border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+            className={`w-full h-12 px-4 rounded-xl bg-input border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 transition-all ${
+              errores.name 
+                ? "border-red-500 focus:ring-red-500/50" 
+                : "border-border focus:ring-ring"
+            }`}
           />
+          {errores.name && <p className="text-sm text-red-500 mt-1">{errores.name}</p>}
         </div>
 
-        {/* --- NUEVO BLOQUE DE ESCUDOS --- */}
+        {/* Campo: Selector de Escudos */}
         <div className="space-y-3 pt-2">
           <label className="text-sm font-medium text-foreground">Selecciona un Escudo</label>
           <div className="grid grid-cols-4 gap-3">
@@ -271,31 +317,27 @@ function FormularioCrearEquipo({ equipoInicial, onBack, showToast, onEquipoGuard
               <button
                 key={escudo.id}
                 type="button"
-                onClick={() => setTeamData({ ...teamData, shieldUrl: escudo.url })}
+                onClick={() => {
+                  setTeamData({ ...teamData, shieldUrl: escudo.url });
+                  // Limpia el error si el usuario selecciona una imagen
+                  if (errores.shieldUrl) setErrores((prev) => ({ ...prev, shieldUrl: "" }));
+                }}
                 className={`aspect-square rounded-xl border-2 transition-all overflow-hidden p-1 ${
                   teamData.shieldUrl === escudo.url 
                     ? "border-primary bg-primary/10" 
-                    : "border-border bg-secondary/30 hover:border-primary/50"
+                    : errores.shieldUrl 
+                      ? "border-red-300 bg-red-50 hover:border-red-400"
+                      : "border-border bg-secondary/30 hover:border-primary/50"
                 }`}
               >
                 <img src={escudo.url} alt={`Opción de escudo ${escudo.id}`} className="w-full h-full object-cover rounded-lg" />
               </button>
             ))}
           </div>
+          {errores.shieldUrl && <p className="text-sm text-red-500 mt-1">{errores.shieldUrl}</p>}
         </div>
 
-        {/* <div className="space-y-2">
-          <label className="text-xs font-medium text-muted-foreground">O pega una URL personalizada (Opcional)</label>
-          <input
-            type="url"
-            value={teamData.shieldUrl}
-            onChange={(e) => setTeamData((prev) => ({ ...prev, shieldUrl: e.target.value }))}
-            placeholder="https://ejemplo.com/escudo.png"
-            className="w-full h-11 px-4 rounded-xl bg-input border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all text-sm"
-          />
-        </div>
-        ------------------------------- */}
-
+        {/* Campo: Nivel Competitivo */}
         <div className="space-y-2 pt-2">
           <label className="text-sm font-medium text-foreground">Nivel Competitivo</label>
           <select

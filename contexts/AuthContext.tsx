@@ -35,8 +35,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const tokenGuardado = localStorage.getItem("token");
     const usuarioGuardado = localStorage.getItem("usuario");
     if (tokenGuardado && usuarioGuardado) {
-      setToken(tokenGuardado);
-      setUsuario(JSON.parse(usuarioGuardado));
+      try {
+        // Validar que el string sea JSON parseable antes de intentarlo
+        if (usuarioGuardado === "undefined" || usuarioGuardado === "null") {
+          throw new Error("Valor inválido en localStorage");
+        }
+        setToken(tokenGuardado);
+        setUsuario(JSON.parse(usuarioGuardado));
+      } catch {
+        // El valor en localStorage está corrupto (p.ej. "undefined" literal).
+        // Limpiar y forzar un nuevo login.
+        localStorage.removeItem("token");
+        localStorage.removeItem("usuario");
+      }
     }
     setCargando(false);
   }, []);

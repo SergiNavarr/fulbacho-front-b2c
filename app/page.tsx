@@ -65,7 +65,7 @@ export default function FulbachoApp() {
         <div className="flex items-center gap-3">
           {usuario && (
             <span className="text-sm font-medium opacity-80 truncate max-w-[120px]">
-              {usuario.nombre}
+              {usuario.username}
             </span>
           )}
           <button

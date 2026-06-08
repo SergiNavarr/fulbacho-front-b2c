@@ -13,9 +13,9 @@ export interface RegistroJugadorDto {
 }
 
 export interface UsuarioAutenticado {
-  id: number;
-  nombre: string;
+  username: string;
   email: string;
+  rol: string;
 }
 
 export interface RespuestaLogin {
@@ -23,32 +23,48 @@ export interface RespuestaLogin {
   usuario: UsuarioAutenticado;
 }
 
+// Refleja exactamente el RespuestaLoginDto del backend
+interface RespuestaLoginBackend {
+  token: string;
+  username: string;
+  email: string;
+  rol: string;
+  expiracion: string;
+}
+
 export const autenticacionService = {
   login: async (credenciales: LoginJugadorDto): Promise<RespuestaLogin> => {
-    const payloadBackend = {
-      email: credenciales.email,
-      password: credenciales.contrasena
-    };
-
-    const { data } = await clienteHttp.post<RespuestaLogin>(
+    const { data } = await clienteHttp.post<RespuestaLoginBackend>(
       "/Autenticacion/login",
-      payloadBackend
+      { email: credenciales.email, password: credenciales.contrasena }
     );
-    return data;
+    return {
+      token: data.token,
+      usuario: {
+        username: data.username,
+        email: data.email,
+        rol: data.rol,
+      },
+    };
   },
 
   registrar: async (datos: RegistroJugadorDto): Promise<RespuestaLogin> => {
-    const payloadBackend = {
-      username: datos.nombre,
-      email: datos.email,
-      password: datos.contrasena,
-      telefono: datos.telefono
-    };
-
-    const { data } = await clienteHttp.post<RespuestaLogin>(
+    const { data } = await clienteHttp.post<RespuestaLoginBackend>(
       "/Autenticacion/registro",
-      payloadBackend
+      {
+        username: datos.nombre,
+        email: datos.email,
+        password: datos.contrasena,
+        telefono: datos.telefono,
+      }
     );
-    return data;
+    return {
+      token: data.token,
+      usuario: {
+        username: data.username,
+        email: data.email,
+        rol: data.rol,
+      },
+    };
   },
 };

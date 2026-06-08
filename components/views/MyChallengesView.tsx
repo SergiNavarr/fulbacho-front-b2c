@@ -1,6 +1,7 @@
 import React from "react";
 import { Inbox, Send } from "lucide-react";
-import { ChallengeSubTab } from "@/app/page";
+
+type ChallengeSubTab = "received" | "sent";
 
 interface MyChallengesViewProps {
   subTab: ChallengeSubTab;

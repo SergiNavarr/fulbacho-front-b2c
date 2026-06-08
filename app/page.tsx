@@ -1,17 +1,18 @@
 "use client";
 
-import { useState } from "react";
-import { Search, Calendar, Shield, LogOut, Check, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Building2, Calendar, Shield, LogOut, Check, X, MapPin } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Spinner } from "@/components/ui/spinner";
 import VistaLogin from "@/components/views/VistaLogin";
 import VistaRegistro from "@/components/views/VistaRegistro";
 import MyTeamManager from "@/components/views/MyTeamManager";
-import SearchRivalView from "@/components/views/SearchRivalView";
-import MyChallengesView from "@/components/views/MyChallengesView";
+import BuscarRivalView from "@/components/views/BuscarRivalView";
+import MisDesafiosView from "@/components/views/MisDesafiosView";
+import ExploracionPrediosView from "@/components/views/ExploracionPrediosView";
+import { equipoService } from "@/services/equipo";
 
-export type Tab = "team" | "search" | "challenges";
-export type ChallengeSubTab = "received" | "sent";
+export type Tab = "predios" | "rivales" | "desafios" | "equipo";
 type ModoAuth = "login" | "registro";
 
 interface Toast {
@@ -22,25 +23,27 @@ interface Toast {
 export default function FulbachoApp() {
   const { isAuthenticated, cargando, usuario, logout } = useAuth();
   const [modoAuth, setModoAuth] = useState<ModoAuth>("login");
-  const [activeTab, setActiveTab] = useState<Tab>("team");
-  const [challengeSubTab, setChallengeSubTab] = useState<ChallengeSubTab>("received");
+  const [activeTab, setActiveTab] = useState<Tab>("equipo");
   const [toast, setToast] = useState<Toast>({ message: "", visible: false });
-  const [searchFilters, setSearchFilters] = useState({
-    zone: "corrientes",
-    startTime: "18:00",
-    endTime: "22:00",
-  });
+  const [idEquipoActivo, setIdEquipoActivo] = useState<number | null>(null);
+  const [cargandoEquipo, setCargandoEquipo] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    setCargandoEquipo(true);
+    equipoService
+      .obtenerMisEquipos()
+      .then((equipos) => {
+        if (equipos.length > 0) setIdEquipoActivo(equipos[0].id);
+      })
+      .catch(console.error)
+      .finally(() => setCargandoEquipo(false));
+  }, [isAuthenticated]);
 
   const showToast = (message: string) => {
     setToast({ message, visible: true });
     setTimeout(() => setToast({ message: "", visible: false }), 3000);
   };
-
-  const mockRivals = [
-    { id: 1, name: "Los Guerreros FC", level: "Intermedio", shield: "https://placehold.co/64x64/166534/white?text=LG" },
-    { id: 2, name: "Deportivo Barrio Norte", level: "Amateur", shield: "https://placehold.co/64x64/0f766e/white?text=DB" },
-    { id: 3, name: "Real Corrientes", level: "Competitivo", shield: "https://placehold.co/64x64/1e3a5f/white?text=RC" },
-  ];
 
   if (cargando) {
     return (
@@ -57,6 +60,41 @@ export default function FulbachoApp() {
       <VistaRegistro onIrALogin={() => setModoAuth("login")} />
     );
   }
+
+  const renderContenido = () => {
+    if (activeTab === "equipo") return <MyTeamManager showToast={showToast} />;
+    if (activeTab === "predios") return <ExploracionPrediosView showToast={showToast} />;
+
+    if (cargandoEquipo) {
+      return (
+        <div className="flex-1 flex items-center justify-center">
+          <Spinner className="size-8 text-primary" />
+        </div>
+      );
+    }
+
+    if (!idEquipoActivo) {
+      return (
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center gap-3">
+          <Shield className="w-16 h-16 text-muted-foreground/30" />
+          <p className="text-muted-foreground text-sm">
+            Primero debés crear un equipo para acceder a esta función.
+          </p>
+          <button
+            className="text-sm font-medium text-primary underline"
+            onClick={() => setActiveTab("equipo")}
+          >
+            Ir a Mis Equipos
+          </button>
+        </div>
+      );
+    }
+
+    if (activeTab === "rivales")
+      return <BuscarRivalView idEquipoLocal={idEquipoActivo} showToast={showToast} />;
+    if (activeTab === "desafios")
+      return <MisDesafiosView idEquipo={idEquipoActivo} showToast={showToast} />;
+  };
 
   return (
     <div className="min-h-[100dvh] flex flex-col w-full max-w-md mx-auto bg-card sm:border-x sm:border-border sm:shadow-sm relative">
@@ -78,39 +116,35 @@ export default function FulbachoApp() {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col bg-background">
-        {activeTab === "team" && <MyTeamManager showToast={showToast} />}
-        {activeTab === "search" && (
-          <SearchRivalView
-            filters={searchFilters}
-            setFilters={setSearchFilters}
-            rivals={mockRivals}
-          />
-        )}
-        {activeTab === "challenges" && (
-          <MyChallengesView subTab={challengeSubTab} setSubTab={setChallengeSubTab} />
-        )}
+      <main className="flex-1 flex flex-col bg-background overflow-hidden">
+        {renderContenido()}
       </main>
 
       <nav className="sticky bottom-0 z-50 flex-shrink-0 border-t border-border bg-card">
         <div className="flex items-center justify-around py-2">
           <TabButton
-            icon={<Search className="w-5 h-5" />}
-            label="Buscar Rival"
-            isActive={activeTab === "search"}
-            onClick={() => setActiveTab("search")}
-          />
-          <TabButton
-            icon={<Calendar className="w-5 h-5" />}
-            label="Mis Desafíos"
-            isActive={activeTab === "challenges"}
-            onClick={() => setActiveTab("challenges")}
+            icon={<MapPin className="w-5 h-5" />}
+            label="Predios"
+            isActive={activeTab === "predios"}
+            onClick={() => setActiveTab("predios")}
           />
           <TabButton
             icon={<Shield className="w-5 h-5" />}
-            label="Mis Equipos"
-            isActive={activeTab === "team"}
-            onClick={() => setActiveTab("team")}
+            label="Rival"
+            isActive={activeTab === "rivales"}
+            onClick={() => setActiveTab("rivales")}
+          />
+          <TabButton
+            icon={<Calendar className="w-5 h-5" />}
+            label="Desafíos"
+            isActive={activeTab === "desafios"}
+            onClick={() => setActiveTab("desafios")}
+          />
+          <TabButton
+            icon={<Building2 className="w-5 h-5" />}
+            label="Mi Equipo"
+            isActive={activeTab === "equipo"}
+            onClick={() => setActiveTab("equipo")}
           />
         </div>
       </nav>
@@ -144,7 +178,7 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`flex flex-col items-center gap-1 px-4 py-2 min-h-[56px] rounded-xl transition-all duration-200 ${
+      className={`flex flex-col items-center gap-1 px-3 py-2 min-h-[56px] rounded-xl transition-all duration-200 ${
         isActive ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground"
       }`}
     >

@@ -1,15 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Calendar, Shield, User, Check, X } from "lucide-react";
-
-
+import { Search, Calendar, Shield, LogOut, Check, X } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { Spinner } from "@/components/ui/spinner";
+import VistaLogin from "@/components/views/VistaLogin";
+import VistaRegistro from "@/components/views/VistaRegistro";
 import MyTeamManager from "@/components/views/MyTeamManager";
 import SearchRivalView from "@/components/views/SearchRivalView";
 import MyChallengesView from "@/components/views/MyChallengesView";
 
 export type Tab = "team" | "search" | "challenges";
 export type ChallengeSubTab = "received" | "sent";
+type ModoAuth = "login" | "registro";
 
 interface Toast {
   message: string;
@@ -17,10 +20,11 @@ interface Toast {
 }
 
 export default function FulbachoApp() {
+  const { isAuthenticated, cargando, usuario, logout } = useAuth();
+  const [modoAuth, setModoAuth] = useState<ModoAuth>("login");
   const [activeTab, setActiveTab] = useState<Tab>("team");
   const [challengeSubTab, setChallengeSubTab] = useState<ChallengeSubTab>("received");
   const [toast, setToast] = useState<Toast>({ message: "", visible: false });
-
   const [searchFilters, setSearchFilters] = useState({
     zone: "corrientes",
     startTime: "18:00",
@@ -29,9 +33,7 @@ export default function FulbachoApp() {
 
   const showToast = (message: string) => {
     setToast({ message, visible: true });
-    setTimeout(() => {
-      setToast({ message: "", visible: false });
-    }, 3000);
+    setTimeout(() => setToast({ message: "", visible: false }), 3000);
   };
 
   const mockRivals = [
@@ -40,21 +42,44 @@ export default function FulbachoApp() {
     { id: 3, name: "Real Corrientes", level: "Competitivo", shield: "https://placehold.co/64x64/1e3a5f/white?text=RC" },
   ];
 
+  if (cargando) {
+    return (
+      <div className="min-h-[100dvh] flex items-center justify-center bg-background">
+        <Spinner className="size-8 text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return modoAuth === "login" ? (
+      <VistaLogin onIrARegistro={() => setModoAuth("registro")} />
+    ) : (
+      <VistaRegistro onIrALogin={() => setModoAuth("login")} />
+    );
+  }
+
   return (
     <div className="min-h-[100dvh] flex flex-col w-full max-w-md mx-auto bg-card sm:border-x sm:border-border sm:shadow-sm relative">
-      
       <header className="sticky top-0 z-50 flex-shrink-0 flex items-center justify-between px-5 py-4 bg-primary text-primary-foreground shadow-sm">
         <h1 className="text-xl font-bold tracking-tight">⚽ Fulbacho</h1>
-        <div className="w-10 h-10 rounded-full bg-primary-foreground/20 flex items-center justify-center">
-          <User className="w-5 h-5" />
+        <div className="flex items-center gap-3">
+          {usuario && (
+            <span className="text-sm font-medium opacity-80 truncate max-w-[120px]">
+              {usuario.nombre}
+            </span>
+          )}
+          <button
+            onClick={logout}
+            title="Cerrar sesión"
+            className="w-9 h-9 rounded-full bg-primary-foreground/20 flex items-center justify-center hover:bg-primary-foreground/30 transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
       </header>
 
       <main className="flex-1 flex flex-col bg-background">
-        {activeTab === "team" && (
-          <MyTeamManager showToast={showToast} /> 
-        )}
-        
+        {activeTab === "team" && <MyTeamManager showToast={showToast} />}
         {activeTab === "search" && (
           <SearchRivalView
             filters={searchFilters}
@@ -62,12 +87,8 @@ export default function FulbachoApp() {
             rivals={mockRivals}
           />
         )}
-        
         {activeTab === "challenges" && (
-          <MyChallengesView
-            subTab={challengeSubTab}
-            setSubTab={setChallengeSubTab}
-          />
+          <MyChallengesView subTab={challengeSubTab} setSubTab={setChallengeSubTab} />
         )}
       </main>
 
@@ -109,7 +130,17 @@ export default function FulbachoApp() {
   );
 }
 
-function TabButton({ icon, label, isActive, onClick }: { icon: React.ReactNode; label: string; isActive: boolean; onClick: () => void; }) {
+function TabButton({
+  icon,
+  label,
+  isActive,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  isActive: boolean;
+  onClick: () => void;
+}) {
   return (
     <button
       onClick={onClick}

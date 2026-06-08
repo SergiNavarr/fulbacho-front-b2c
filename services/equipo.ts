@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "./api";
+import clienteHttp from "./clienteHttp";
 
 export interface CrearEquipoRequest {
   nombre: string;
@@ -14,52 +14,33 @@ export interface EquipoResponse {
 }
 
 export const equipoService = {
-  // Función específica para crear un equipo
   crear: async (data: CrearEquipoRequest): Promise<boolean> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/b2c/Equipos`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        throw new Error("Error al guardar en el backend");
-      }
-
+      await clienteHttp.post("/Equipos", data);
       return true;
     } catch (error) {
       console.error("Error en equipoService.crear:", error);
-      throw error; 
+      throw error;
     }
   },
+
   actualizar: async (id: number, data: CrearEquipoRequest): Promise<boolean> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/b2c/Equipos/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) throw new Error("Error al actualizar");
+      await clienteHttp.put(`/Equipos/${id}`, data);
       return true;
     } catch (error) {
       console.error("Error en equipoService.actualizar:", error);
       throw error;
     }
   },
+
   obtenerMisEquipos: async (): Promise<EquipoResponse[]> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/b2c/Equipos/mis-equipos`);
-      if (!response.ok) throw new Error("Error al obtener los equipos");
-      
-      const data = await response.json();
+      const { data } = await clienteHttp.get<EquipoResponse[]>("/Equipos/mis-equipos");
       return data;
     } catch (error) {
       console.error("Error en equipoService.obtenerMisEquipos:", error);
-      return []; 
+      return [];
     }
   },
 };

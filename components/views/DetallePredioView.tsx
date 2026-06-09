@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import axios from "axios";
 import { ArrowLeft, MapPin, CalendarPlus, Swords, Shield } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,13 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { CanchaResponse, PredioResponse } from "@/services/predio";
 import { reservaService } from "@/services/reserva";
@@ -26,16 +34,56 @@ interface Props {
   onBack: () => void;
 }
 
-// El input type="time" devuelve "HH:mm"; el back espera un TimeSpan "HH:mm:ss".
+// Los turnos arrancan en horas enteras de 08:00 a 23:00.
+const HORAS_TURNO = Array.from({ length: 16 }, (_, i) => `${String(i + 8).padStart(2, "0")}:00`);
+
+// Duraciones permitidas (en horas). El back recalcula el precio igual.
+const DURACIONES = [
+  { value: "1", label: "1 hora" },
+  { value: "1.5", label: "1 hora y media" },
+  { value: "2", label: "2 horas" },
+];
+
+// "HH:mm" + duración (horas) => "HH:mm". Puede cruzar medianoche (ej. 23:00 + 2h).
+const sumarDuracion = (horaInicio: string, duracionHoras: number): string => {
+  const [h, m] = horaInicio.split(":").map(Number);
+  const total = h * 60 + m + Math.round(duracionHoras * 60);
+  const hh = Math.floor(total / 60) % 24;
+  const mm = total % 60;
+  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+};
+
+// Una hora "HH:mm" se envía al back como TimeSpan "HH:mm:ss".
 const aTimeSpan = (hora: string) => (hora.length === 5 ? `${hora}:00` : hora);
+
+// Serializa una fecha en hora LOCAL sin convertir a UTC (sin la "Z" de toISOString).
+// Así la hora que elige el usuario es exactamente la que llega al back. Ver nota
+// sobre el bug de zona horaria en confirmarReserva.
+const aISOLocal = (fecha: Date): string => {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${fecha.getFullYear()}-${pad(fecha.getMonth() + 1)}-${pad(fecha.getDate())}` +
+    `T${pad(fecha.getHours())}:${pad(fecha.getMinutes())}:00`
+  );
+};
+
+// Lee el mensaje real del back ({ error: "..." }) cuando una escritura falla.
+const mensajeDeError = (error: unknown, generico: string): string => {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data as { error?: string; message?: string } | undefined;
+    return data?.error ?? data?.message ?? generico;
+  }
+  return generico;
+};
 
 export default function DetallePredioView({ predio, idEquipoLocal, showToast, onBack }: Props) {
   const canchas = predio.canchas ?? [];
 
   // Estado del modal de Reserva
   const [canchaReserva, setCanchaReserva] = useState<CanchaResponse | null>(null);
-  const [fechaHoraReserva, setFechaHoraReserva] = useState("");
-  const [horaFinReserva, setHoraFinReserva] = useState("");
+  const [fechaReserva, setFechaReserva] = useState("");
+  const [horaInicioReserva, setHoraInicioReserva] = useState("");
+  const [duracionReserva, setDuracionReserva] = useState("1");
   const [reservando, setReservando] = useState(false);
 
   // Estado del modal de Desafío
@@ -45,38 +93,44 @@ export default function DetallePredioView({ predio, idEquipoLocal, showToast, on
   const [idRival, setIdRival] = useState("");
   const [fechaDesafio, setFechaDesafio] = useState("");
   const [horaInicioDesafio, setHoraInicioDesafio] = useState("");
-  const [horaFinDesafio, setHoraFinDesafio] = useState("");
+  const [duracionDesafio, setDuracionDesafio] = useState("1");
   const [desafiando, setDesafiando] = useState(false);
+
+  // Precio estimado del turno = precio/hora de la cancha × duración elegida.
+  // Informativo: el back recalcula el total al confirmar.
+  const totalEstimadoReserva = canchaReserva
+    ? canchaReserva.precioPorHora * parseFloat(duracionReserva)
+    : 0;
 
   // --- Reserva ---
   const abrirReserva = (cancha: CanchaResponse) => {
     setCanchaReserva(cancha);
-    setFechaHoraReserva("");
-    setHoraFinReserva("");
+    setFechaReserva("");
+    setHoraInicioReserva("");
+    setDuracionReserva("1");
   };
 
   const confirmarReserva = async () => {
-    if (!canchaReserva || !fechaHoraReserva || !horaFinReserva) return;
-    // La reserva es del mismo día: reusamos la fecha del inicio y la combinamos
-    // con la hora de fin (mismo patrón que el modal de Desafío).
-    const fechaInicio = fechaHoraReserva.split("T")[0];
-    const inicio = new Date(fechaHoraReserva);
-    const fin = new Date(`${fechaInicio}T${horaFinReserva}`);
-    if (fin <= inicio) {
-      showToast("La hora de fin debe ser posterior al inicio.");
-      return;
-    }
+    if (!canchaReserva || !fechaReserva || !horaInicioReserva) return;
+    // Bug de zona horaria (arreglado): antes el inicio se armaba con
+    // new Date(datetime-local) en hora local y se enviaba con toISOString() en
+    // UTC, lo que en AR (UTC-3) corría la hora +3. Ahora construimos inicio y fin
+    // de forma consistente y los serializamos con aISOLocal (sin "Z"), así la hora
+    // que ve el usuario es exactamente la que recibe el back.
+    const duracionHoras = parseFloat(duracionReserva);
+    const inicio = new Date(`${fechaReserva}T${horaInicioReserva}:00`);
+    const fin = new Date(inicio.getTime() + duracionHoras * 60 * 60 * 1000);
     setReservando(true);
     try {
       await reservaService.crear({
         idCancha: canchaReserva.id,
-        fechaHoraInicio: inicio.toISOString(),
-        fechaHoraFin: fin.toISOString(),
+        fechaHoraInicio: aISOLocal(inicio),
+        fechaHoraFin: aISOLocal(fin),
       });
       setCanchaReserva(null);
       showToast("¡Reserva creada con éxito!");
-    } catch {
-      showToast("Error al crear la reserva. Intentá de nuevo.");
+    } catch (error) {
+      showToast(mensajeDeError(error, "Error al crear la reserva. Intentá de nuevo."));
     } finally {
       setReservando(false);
     }
@@ -92,7 +146,7 @@ export default function DetallePredioView({ predio, idEquipoLocal, showToast, on
     setIdRival("");
     setFechaDesafio("");
     setHoraInicioDesafio("");
-    setHoraFinDesafio("");
+    setDuracionDesafio("1");
   };
 
   // Cargamos los rivales recién cuando se abre el modal de desafío.
@@ -107,24 +161,27 @@ export default function DetallePredioView({ predio, idEquipoLocal, showToast, on
   }, [canchaDesafio, idEquipoLocal]);
 
   const confirmarDesafio = async () => {
-    if (!idEquipoLocal || !canchaDesafio || !idRival || !fechaDesafio || !horaInicioDesafio || !horaFinDesafio)
+    if (!idEquipoLocal || !canchaDesafio || !idRival || !fechaDesafio || !horaInicioDesafio)
       return;
-    // El idZona sale del predio (NO se pide a mano).
+    // El idZona sale del predio (NO se pide a mano). La hora de fin se deriva de
+    // la duración elegida.
     const idZona = predio.idZona;
+    const horaFin = sumarDuracion(horaInicioDesafio, parseFloat(duracionDesafio));
     setDesafiando(true);
     try {
       await desafioService.crear({
+        idEquipoLocal: idEquipoLocal,
         idEquipoVisitante: parseInt(idRival, 10),
         fechaPropuesta: fechaDesafio,
         horaInicio: aTimeSpan(horaInicioDesafio),
-        horaFin: aTimeSpan(horaFinDesafio),
+        horaFin: aTimeSpan(horaFin),
         idZona,
         idCanchaSugerida: canchaDesafio.id,
       });
       setCanchaDesafio(null);
       showToast("¡Desafío enviado con éxito!");
-    } catch {
-      showToast("Error al enviar el desafío. Intentá de nuevo.");
+    } catch (error) {
+      showToast(mensajeDeError(error, "Error al enviar el desafío. Intentá de nuevo."));
     } finally {
       setDesafiando(false);
     }
@@ -210,26 +267,60 @@ export default function DetallePredioView({ predio, idEquipoLocal, showToast, on
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Fecha y hora de inicio</label>
+              <label className="text-sm font-medium">Fecha</label>
               <Input
-                type="datetime-local"
-                value={fechaHoraReserva}
-                onChange={(e) => setFechaHoraReserva(e.target.value)}
+                type="date"
+                value={fechaReserva}
+                onChange={(e) => setFechaReserva(e.target.value)}
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Hora de fin</label>
-              <Input
-                type="time"
-                value={horaFinReserva}
-                onChange={(e) => setHoraFinReserva(e.target.value)}
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Hora de inicio</label>
+                <Select value={horaInicioReserva} onValueChange={setHoraInicioReserva}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Hora" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {HORAS_TURNO.map((hora) => (
+                      <SelectItem key={hora} value={hora}>
+                        {hora}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Duración</label>
+                <Select value={duracionReserva} onValueChange={setDuracionReserva}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DURACIONES.map((d) => (
+                      <SelectItem key={d.value} value={d.value}>
+                        {d.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+
+            {/* Costo estimado en vivo (el back recalcula al confirmar). */}
+            {canchaReserva && (
+              <div className="flex items-center justify-between rounded-xl bg-secondary px-4 py-3">
+                <span className="text-sm text-muted-foreground">Total estimado</span>
+                <span className="text-base font-bold text-foreground">
+                  ${totalEstimadoReserva} por {DURACIONES.find((d) => d.value === duracionReserva)?.label}
+                </span>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button
               className="w-full"
-              disabled={reservando || !fechaHoraReserva || !horaFinReserva}
+              disabled={reservando || !fechaReserva || !horaInicioReserva}
               onClick={confirmarReserva}
             >
               {reservando && <Spinner className="w-4 h-4 mr-2" />}
@@ -284,19 +375,33 @@ export default function DetallePredioView({ predio, idEquipoLocal, showToast, on
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Hora inicio</label>
-                <Input
-                  type="time"
-                  value={horaInicioDesafio}
-                  onChange={(e) => setHoraInicioDesafio(e.target.value)}
-                />
+                <Select value={horaInicioDesafio} onValueChange={setHoraInicioDesafio}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Hora" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {HORAS_TURNO.map((hora) => (
+                      <SelectItem key={hora} value={hora}>
+                        {hora}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Hora fin</label>
-                <Input
-                  type="time"
-                  value={horaFinDesafio}
-                  onChange={(e) => setHoraFinDesafio(e.target.value)}
-                />
+                <label className="text-sm font-medium">Duración</label>
+                <Select value={duracionDesafio} onValueChange={setDuracionDesafio}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DURACIONES.map((d) => (
+                      <SelectItem key={d.value} value={d.value}>
+                        {d.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>
@@ -307,8 +412,7 @@ export default function DetallePredioView({ predio, idEquipoLocal, showToast, on
                 desafiando ||
                 !idRival ||
                 !fechaDesafio ||
-                !horaInicioDesafio ||
-                !horaFinDesafio
+                !horaInicioDesafio
               }
               onClick={confirmarDesafio}
             >

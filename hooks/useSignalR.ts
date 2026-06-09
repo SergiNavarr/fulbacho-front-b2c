@@ -3,9 +3,24 @@
 import { useEffect, useRef, useState } from "react";
 import { HubConnectionBuilder, HubConnection } from "@microsoft/signalr";
 
+// Contrato real del back: emite SIEMPRE el método "DesafioActualizado" con UN
+// solo payload que trae el estado ("Creado"|"Aceptado"|"Rechazado") y los datos
+// del desafío. El casing depende de cómo serialice el JSON el back (C# es
+// PascalCase, pero SignalR puede mandar camelCase), por eso aceptamos ambas
+// variantes y la discriminación real la hace el consumidor.
+export interface DesafioEventoPayload {
+  id?: number;
+  Id?: number;
+  desafioId?: number;
+  DesafioId?: number;
+  estado?: string;
+  Estado?: string;
+  [key: string]: unknown;
+}
+
 interface Opciones {
   idEquipo: number | null;
-  onDesafioActualizado: (desafioId: number, evento: string) => void;
+  onDesafioActualizado: (payload: DesafioEventoPayload) => void;
 }
 
 export function useSignalR({ idEquipo, onDesafioActualizado }: Opciones) {
@@ -34,8 +49,8 @@ export function useSignalR({ idEquipo, onDesafioActualizado }: Opciones) {
       .withAutomaticReconnect()
       .build();
 
-    conexion.on("DesafioActualizado", (desafioId: number, evento: string) => {
-      callbackRef.current(desafioId, evento);
+    conexion.on("DesafioActualizado", (payload: DesafioEventoPayload) => {
+      callbackRef.current(payload);
     });
 
     conexion.onreconnecting(() => setConectado(false));

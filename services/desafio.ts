@@ -30,6 +30,25 @@ export interface DesafioResponse {
   zona?: string;
 }
 
+// DTO enriquecido que devuelve el LISTADO GET /Desafios?idEquipo=.
+// A diferencia de DesafioResponse, el back ya calcula el "rol" (Enviado/Recibido)
+// y adjunta los datos del rival, horario y cancha.
+export interface DesafioListadoResponse {
+  id: number;
+  idEquipoLocal: number;
+  idEquipoVisitante: number;
+  rol: "Enviado" | "Recibido";
+  rivalNombre: string;
+  rivalEscudoUrl: string;
+  rivalNivel: string;
+  estado: string;
+  fechaPropuesta: string; // UTC con Z
+  horaInicio: string; // "HH:mm:ss"
+  horaFin: string; // "HH:mm:ss"
+  zona?: string;
+  cancha?: string;
+}
+
 export const desafioService = {
   crear: async (datos: CrearDesafioRequest): Promise<{ id: number }> => {
     const { data } = await clienteHttp.post<{ id: number }>("/Desafios", datos);
@@ -38,6 +57,15 @@ export const desafioService = {
 
   obtenerPorId: async (id: number): Promise<DesafioResponse> => {
     const { data } = await clienteHttp.get<DesafioResponse>(`/Desafios/${id}`);
+    return data;
+  },
+
+  // GET /Desafios?idEquipo= -> lista de desafíos del equipo (recibidos y enviados).
+  // Devuelve el DTO enriquecido (rol, rival, horario, cancha) ya resuelto por el back.
+  obtenerPorEquipo: async (idEquipo: number): Promise<DesafioListadoResponse[]> => {
+    const { data } = await clienteHttp.get<DesafioListadoResponse[]>("/Desafios", {
+      params: { idEquipo },
+    });
     return data;
   },
 

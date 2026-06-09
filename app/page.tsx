@@ -10,7 +10,14 @@ import MyTeamManager from "@/components/views/MyTeamManager";
 import BuscarRivalView from "@/components/views/BuscarRivalView";
 import MisDesafiosView from "@/components/views/MisDesafiosView";
 import ExploracionPrediosView from "@/components/views/ExploracionPrediosView";
-import { equipoService } from "@/services/equipo";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { equipoService, EquipoResponse } from "@/services/equipo";
 
 export type Tab = "predios" | "rivales" | "desafios" | "equipo";
 type ModoAuth = "login" | "registro";
@@ -25,6 +32,9 @@ export default function FulbachoApp() {
   const [modoAuth, setModoAuth] = useState<ModoAuth>("login");
   const [activeTab, setActiveTab] = useState<Tab>("equipo");
   const [toast, setToast] = useState<Toast>({ message: "", visible: false });
+  // Lista completa de equipos del capitán + el id del que está activo. El activo
+  // se mantiene en memoria durante la sesión (sin localStorage, a propósito).
+  const [equipos, setEquipos] = useState<EquipoResponse[]>([]);
   const [idEquipoActivo, setIdEquipoActivo] = useState<number | null>(null);
   const [cargandoEquipo, setCargandoEquipo] = useState(false);
 
@@ -33,8 +43,9 @@ export default function FulbachoApp() {
     setCargandoEquipo(true);
     equipoService
       .obtenerMisEquipos()
-      .then((equipos) => {
-        if (equipos.length > 0) setIdEquipoActivo(equipos[0].id);
+      .then((misEquipos) => {
+        setEquipos(misEquipos);
+        if (misEquipos.length > 0) setIdEquipoActivo(misEquipos[0].id);
       })
       .catch(console.error)
       .finally(() => setCargandoEquipo(false));
@@ -99,22 +110,51 @@ export default function FulbachoApp() {
 
   return (
     <div className="min-h-[100dvh] flex flex-col w-full max-w-md mx-auto bg-card sm:border-x sm:border-border sm:shadow-sm relative">
-      <header className="sticky top-0 z-50 flex-shrink-0 flex items-center justify-between px-5 py-4 bg-primary text-primary-foreground shadow-sm">
-        <h1 className="text-xl font-bold tracking-tight">⚽ Fulbacho</h1>
-        <div className="flex items-center gap-3">
-          {usuario && (
-            <span className="text-sm font-medium opacity-80 truncate max-w-[120px]">
-              {usuario.username}
-            </span>
-          )}
-          <button
-            onClick={logout}
-            title="Cerrar sesión"
-            className="w-9 h-9 rounded-full bg-primary-foreground/20 flex items-center justify-center hover:bg-primary-foreground/30 transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
+      <header className="sticky top-0 z-50 flex-shrink-0 flex flex-col gap-3 px-5 py-4 bg-primary text-primary-foreground shadow-sm">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold tracking-tight">⚽ Fulbacho</h1>
+          <div className="flex items-center gap-3">
+            {usuario && (
+              <span className="text-sm font-medium opacity-80 truncate max-w-[120px]">
+                {usuario.username}
+              </span>
+            )}
+            <button
+              onClick={logout}
+              title="Cerrar sesión"
+              className="w-9 h-9 rounded-full bg-primary-foreground/20 flex items-center justify-center hover:bg-primary-foreground/30 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
+
+        {/* Selector global de equipo activo: con él se desafía, reserva y se
+            reciben desafíos. Si hay un solo equipo, queda deshabilitado. */}
+        {equipos.length > 0 && (
+          <div className="flex items-center gap-2">
+            <Shield className="w-4 h-4 flex-shrink-0 opacity-80" />
+            <Select
+              value={idEquipoActivo ? String(idEquipoActivo) : undefined}
+              onValueChange={(valor) => setIdEquipoActivo(Number(valor))}
+              disabled={equipos.length === 1}
+            >
+              <SelectTrigger
+                aria-label="Equipo activo"
+                className="w-full h-9 bg-primary-foreground/15 border-primary-foreground/25 text-primary-foreground disabled:opacity-100 [&_svg]:text-primary-foreground/70"
+              >
+                <SelectValue placeholder="Elegí un equipo" />
+              </SelectTrigger>
+              <SelectContent>
+                {equipos.map((equipo) => (
+                  <SelectItem key={equipo.id} value={String(equipo.id)}>
+                    {equipo.nombre} · {equipo.nivel}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </header>
 
       <main className="flex-1 flex flex-col bg-background overflow-hidden">

@@ -1,18 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Shield } from "lucide-react";
+import { Shield, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { desafioService, RivalResponse } from "@/services/desafio";
 
@@ -24,11 +16,6 @@ interface Props {
 export default function BuscarRivalView({ idEquipoLocal, showToast }: Props) {
   const [rivales, setRivales] = useState<RivalResponse[]>([]);
   const [cargando, setCargando] = useState(true);
-  const [rivalSeleccionado, setRivalSeleccionado] = useState<RivalResponse | null>(null);
-  const [dialogAbierto, setDialogAbierto] = useState(false);
-  const [fechaHora, setFechaHora] = useState("");
-  const [idZona, setIdZona] = useState("");
-  const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
     desafioService
@@ -38,30 +25,10 @@ export default function BuscarRivalView({ idEquipoLocal, showToast }: Props) {
       .finally(() => setCargando(false));
   }, [idEquipoLocal]);
 
-  const abrirDialog = (rival: RivalResponse) => {
-    setRivalSeleccionado(rival);
-    setFechaHora("");
-    setIdZona("");
-    setDialogAbierto(true);
-  };
-
-  const enviarDesafio = async () => {
-    if (!rivalSeleccionado || !fechaHora || !idZona) return;
-    setEnviando(true);
-    try {
-      await desafioService.crear({
-        idEquipoLocal,
-        idEquipoVisitante: rivalSeleccionado.id,
-        idZona: parseInt(idZona, 10),
-        fechaHoraPropuesta: new Date(fechaHora).toISOString(),
-      });
-      setDialogAbierto(false);
-      showToast("¡Desafío enviado con éxito!");
-    } catch {
-      showToast("Error al enviar el desafío. Intentá de nuevo.");
-    } finally {
-      setEnviando(false);
-    }
+  // El desafío ahora requiere una cancha concreta (idCanchaSugerida), así que se
+  // inicia desde el detalle de un predio. Acá solo exploramos rivales y derivamos.
+  const guiarADesafio = () => {
+    showToast("Para desafiar, elegí una cancha desde la pestaña Predios.");
   };
 
   if (cargando) {
@@ -108,8 +75,13 @@ export default function BuscarRivalView({ idEquipoLocal, showToast }: Props) {
                       {rival.nivel}
                     </Badge>
                   </div>
-                  <Button size="sm" onClick={() => abrirDialog(rival)} className="flex-shrink-0">
-                    Desafiar
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={guiarADesafio}
+                    className="flex-shrink-0"
+                  >
+                    <MapPin className="w-4 h-4 mr-1.5" /> Desafiar
                   </Button>
                 </CardContent>
               </Card>
@@ -117,43 +89,6 @@ export default function BuscarRivalView({ idEquipoLocal, showToast }: Props) {
           </div>
         )}
       </div>
-
-      <Dialog open={dialogAbierto} onOpenChange={setDialogAbierto}>
-        <DialogContent className="w-[calc(100vw-2rem)] max-w-md rounded-2xl">
-          <DialogHeader>
-            <DialogTitle>Desafiar a {rivalSeleccionado?.nombre}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Fecha y hora propuesta</label>
-              <Input
-                type="datetime-local"
-                value={fechaHora}
-                onChange={(e) => setFechaHora(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">ID de zona</label>
-              <Input
-                type="number"
-                placeholder="Ej: 1"
-                value={idZona}
-                onChange={(e) => setIdZona(e.target.value)}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              className="w-full"
-              disabled={enviando || !fechaHora || !idZona}
-              onClick={enviarDesafio}
-            >
-              {enviando && <Spinner className="w-4 h-4 mr-2" />}
-              Enviar Desafío
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

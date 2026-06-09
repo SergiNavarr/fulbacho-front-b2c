@@ -14,19 +14,45 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { predioService, PredioResponse } from "@/services/predio";
+import DetallePredioView from "@/components/views/DetallePredioView";
 
 interface Props {
+  // Equipo local del usuario, necesario para el flujo de desafío en el detalle.
+  idEquipoActivo?: number | null;
   showToast: (msg: string) => void;
 }
 
 const TODAS_LAS_ZONAS = "_all";
 
-export default function ExploracionPrediosView({ showToast }: Props) {
+export default function ExploracionPrediosView({ idEquipoActivo, showToast }: Props) {
   const [predios, setPredios] = useState<PredioResponse[]>([]);
   const [cargando, setCargando] = useState(true);
   const [nombre, setNombre] = useState("");
   const [zona, setZona] = useState(TODAS_LAS_ZONAS);
   const [zonasDisponibles, setZonasDisponibles] = useState<string[]>([]);
+
+  // Navegación interna por estado (mismo patrón que MyTeamManager): list <-> detail.
+  const [vista, setVista] = useState<"list" | "detail">("list");
+  const [predioSeleccionado, setPredioSeleccionado] = useState<PredioResponse | null>(null);
+  const [cargandoDetalle, setCargandoDetalle] = useState(false);
+
+  const abrirDetalle = (id: number) => {
+    setCargandoDetalle(true);
+    setVista("detail");
+    predioService
+      .obtenerPorId(id)
+      .then(setPredioSeleccionado)
+      .catch(() => {
+        showToast("Error al cargar el detalle del predio.");
+        setVista("list");
+      })
+      .finally(() => setCargandoDetalle(false));
+  };
+
+  const volverAlListado = () => {
+    setVista("list");
+    setPredioSeleccionado(null);
+  };
 
   useEffect(() => {
     predioService
@@ -51,6 +77,24 @@ export default function ExploracionPrediosView({ showToast }: Props) {
       .catch(() => showToast("Error al filtrar predios."))
       .finally(() => setCargando(false));
   };
+
+  if (vista === "detail") {
+    if (cargandoDetalle || !predioSeleccionado) {
+      return (
+        <div className="flex-1 flex items-center justify-center p-8 h-full">
+          <Spinner className="w-8 h-8 text-primary" />
+        </div>
+      );
+    }
+    return (
+      <DetallePredioView
+        predio={predioSeleccionado}
+        idEquipoLocal={idEquipoActivo}
+        showToast={showToast}
+        onBack={volverAlListado}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -96,7 +140,11 @@ export default function ExploracionPrediosView({ showToast }: Props) {
         ) : (
           <div className="space-y-3">
             {predios.map((predio) => (
-              <Card key={predio.id} className="overflow-hidden">
+              <Card
+                key={predio.id}
+                onClick={() => abrirDetalle(predio.id)}
+                className="overflow-hidden cursor-pointer hover:border-primary/50 transition-colors"
+              >
                 {predio.imagenUrl ? (
                   <img
                     src={predio.imagenUrl}

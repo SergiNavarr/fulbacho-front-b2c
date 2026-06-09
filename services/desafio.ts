@@ -1,10 +1,15 @@
 import clienteHttp from "./clienteHttp";
 
+// Alineado al DTO real del back (CrearDesafioDto). El idEquipoLocal NO viaja en el
+// body: el back lo deriva del token. La fecha y las horas van por separado, y la
+// hora se envía como TimeSpan "HH:mm:ss". La cancha sugerida ahora es obligatoria.
 export interface CrearDesafioRequest {
-  idEquipoLocal: number;
   idEquipoVisitante: number;
+  fechaPropuesta: string; // fecha "YYYY-MM-DD"
+  horaInicio: string; // TimeSpan "HH:mm:ss"
+  horaFin: string; // TimeSpan "HH:mm:ss"
   idZona: number;
-  fechaHoraPropuesta: string;
+  idCanchaSugerida: number;
 }
 
 export interface RivalResponse {

@@ -63,7 +63,8 @@ export default function FulbachoApp() {
 
   const renderContenido = () => {
     if (activeTab === "equipo") return <MyTeamManager showToast={showToast} />;
-    if (activeTab === "predios") return <ExploracionPrediosView showToast={showToast} />;
+    if (activeTab === "predios")
+      return <ExploracionPrediosView idEquipoActivo={idEquipoActivo} showToast={showToast} />;
 
     if (cargandoEquipo) {
       return (
